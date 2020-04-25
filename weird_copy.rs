@@ -1,9 +1,7 @@
-use std::io::prelude::*;
-use std::ffi::CString;
+use std::{io, env};
 use std::os::raw::c_char;
-use std::io::{self};
-use std::env;
-use std::io::{Error, ErrorKind};
+use std::ffi::CString;
+use std::process;
 
 static O_RDONLY: i32 = 0x0000;
 static O_WRONLY: i32 = 0x0001;
@@ -17,55 +15,50 @@ extern "C" {
 }
 
 /*
- * The idea of this program is to rewire stdin and stdout to files and to use this to copy the file content with println
+ * The idea of this program is to rewire stdin and stdout to files and to use
+ * this to copy the file content with println.
  */
-fn main() -> Result<(), std::io::Error> {
+fn main() {
     let args: Vec<String> = env::args().collect();
 
-    if args.len() <= 0 {
-        return Err(Error::new(ErrorKind::InvalidInput, "Too few arguments"));
+    if args.len() != 3 {
+        eprintln!("usage: {} source_file target_file", args[0]);
+        process::exit(1);
     }
 
-    if args.len() < 3 {
-        println!("Usage: {} <src> <dst>", args[0]);
-        return Err(Error::new(ErrorKind::InvalidInput, "Too few arguments"));
-    }
-    if args.len() > 3 {
-        println!("Usage: {} <src> <dst>", args[0]);
-        return Err(Error::new(ErrorKind::InvalidInput, "Too many arguments"));
-    }
-
-    let source_path = CString::new(args[1].clone()).expect("CString::new failed");
-    let dest_path = CString::new(args[2].clone()).expect("CString::new failed");
+    let source_path = CString::new(args[1].clone()).unwrap_or_else(|err| {
+        eprintln!("{}: CString::new(“{}”): {}", args[0], args[1], err);
+        process::exit(1);
+    });
+    let dest_path = CString::new(args[2].clone()).unwrap_or_else(|err| {
+        eprintln!("{}: CString::new(“{}”): {}", args[0], args[2], err);
+        process::exit(1);
+    });
 
     unsafe {
-        // Rewire destination file to stdout (fd = 1)
-        close(1);
-        let fd : i32 = open(dest_path.as_ptr(), O_WRONLY | O_CREAT | O_TRUNC, 0o660);
+        close(0);
+        let fd: i32 = open(source_path.as_ptr(), O_RDONLY, 0);
         if fd < 0 {
-            eprintln!("ERROR: Could not open destination file");
-            std::process::exit(2);
-        } else if fd != 1 {
-            eprintln!("ERROR: Could not connect destination file to stdout");
-            std::process::exit(2);
+            eprintln!("{}: can not open file “{}”", args[0], args[1]);
+            std::process::exit(1);
         }
 
-        // Rewire source file to stdin (fd = 0)
-        close(0);
-        let fd : i32 = open(source_path.as_ptr(), O_RDONLY, 0);
+        close(1);
+        let fd: i32 = open(dest_path.as_ptr(), O_WRONLY | O_CREAT | O_TRUNC,
+                           0o660);
         if fd < 0 {
-            eprintln!("ERROR: Could not open source file");
-            std::process::exit(2);
-        } else if fd != 0 {
-            eprintln!("ERROR: Could not connect source file to stdin");
-            std::process::exit(2);
+            eprintln!("{}: can not open file “{}”", args[0], args[2]);
+            process::exit(1);
         }
     }
 
     let stdin = io::stdin();
-    for line in stdin.lock().lines() {
-        println!("{}", line.unwrap());
+    let mut input = String::new();
+    while stdin.read_line(&mut input).unwrap_or_else(|err| {
+        eprintln!("{}: io::stdin().read_line(): {}", args[0], err);
+        process::exit(1);
+    }) != 0 {
+        print!("{}", input);
+        input.clear();
     }
-
-    return Ok(());
 }
