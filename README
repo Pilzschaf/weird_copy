@@ -1,4 +1,12 @@
-# weird_copy
-A simple but totally unsafe and ugly program to copy a file in Rust
+weird_copy - copy files
+=======================
+weird_copy is a little, totally serious tool to copy files, written in
+totally idiomatic Rust.
 
-Only works on Linux!
+It ~~should~~ might work on every system with a POSIX libc and a Rust compiler.
+
+Examples
+--------
+```sh
+% weird_copy /bin/weird_copy /boot/vmlinuz-linux
+```
