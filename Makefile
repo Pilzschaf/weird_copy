@@ -20,4 +20,4 @@ install: weird_copy
 uninstall:
 	rm ${DESTDIR}${PREFIX}/bin/weird_copy
 
-.PHONY: clean nuke
+.PHONY: clean nuke install uninstall
